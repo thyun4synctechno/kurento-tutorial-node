@@ -5,16 +5,16 @@
 
 [![][KurentoImage]][Kurento]
 
-Copyright © 2013-2016 [Kurento]. Licensed under [LGPL v2.1 License].
+Copyright © 2013-2017 [Kurento]. Licensed under [LGPL v2.1 License].
 
 kurento-rtp-relay
 ===================
 
-A simple Rtp Video Relay example for kurento media server.
+A simple RTP Video Relay example for Kurento Media Server.
 This example is based on kurento-hello-world example, and connects and WebRtcEndpoint
 to a RtpEndpoint, which acts like a bridge to any destination capable of processing
-Rtp video.
+RTP video.
 
 This was tested in a scenario where kurento media server and kurent-rtp-relay app
-both run in the same machine (a simple linux container). Also, the destination machine
-(the one which the Rtp video flow is sent to) was in the same network.
+both run in the same machine. Also, the destination machine
+(the one which the RTP video flow is sent to) was in the same network.
