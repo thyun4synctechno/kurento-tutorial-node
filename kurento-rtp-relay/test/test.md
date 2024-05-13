@@ -227,3 +227,9 @@ bash -c 'gst-launch-1.0 -e \
 
 
 gst-launch-1.0 videotestsrc ! x265enc option-string="keyint=30:min-keyint=30:repeat-headers=1" ! video/x-h265, mapping=/stream1 ! rtspsink service=5000
+
+
+
+
+
+docker run --rm \-p 8888:8888/tcp \-p 5000-5050:5000-5050/udp \-e KMS_MIN_PORT=5000 \-e KMS_MAX_PORT=5050 \kurento/kurento-media-server:latest
