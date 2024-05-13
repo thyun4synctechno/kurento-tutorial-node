@@ -13,7 +13,7 @@
  *
  */
 
-var ws = new WebSocket('wss://' + location.host + '/rtprelay');
+var ws = null; 
 var videoInput;
 var videoOutput;
 var webRtcPeer;
@@ -26,6 +26,15 @@ const I_CAN_START = 0;
 const I_CAN_STOP = 1;
 const I_AM_STARTING = 2;
 
+
+try {
+	var ws = new WebSocket('wss://localhost:8443/ws');
+}
+catch(ex) {
+	console.log( ex );
+}
+
+
 window.onload = function() {
 	console = new Console();
 	console.log('Page loaded ...');
@@ -37,6 +46,7 @@ window.onload = function() {
 	rtpSdp = document.getElementById('rtpSdp');
 	destinationIp.oninput = updateRtpSdp;
 	destinationPort.oninput = updateRtpSdp;
+	updateRtpSdp();
 }
 
 window.onbeforeunload = function() {
@@ -209,9 +219,16 @@ function updateRtpSdp() {
 
 	rtpSdp.value = 'v=0\n'
 	+ 'o=- 0 0 IN IP4 ' + destination_ip + '\n'
-	+ 's=Kurento\n'
+	+ 's=livestream\n'
 	+ 'c=IN IP4 ' + destination_ip + '\n'
 	+ 't=0 0\n'
 	+ 'm=video ' + destination_port + ' RTP/AVP 100\n'
 	+ 'a=rtpmap:100 H264/90000\n';
+
+
+
+// 	rtpSdp.value = `v=0
+// m=video ${destination_port} RTP/AVP 96
+// c=IN IP4 ${destination_ip}
+// a=rtpmap:96 H264/90000`
 }

@@ -14,6 +14,7 @@
  */
 
 var path = require('path');
+var cors = require('cors');
 var url = require('url');
 var cookieParser = require('cookie-parser')
 var express = require('express');
@@ -27,14 +28,15 @@ var https = require('https');
 var argv = minimist(process.argv.slice(2), {
     default: {
         as_uri: 'https://localhost:8443/',
-        ws_uri: 'ws://localhost:8888/kurento'
+        ws_uri2: 'ws://data.iotocean.org:8888/kurento',
+        ws_uri: 'ws://127.0.0.1:8888/kurento'
     }
 });
 
 var options =
 {
-  key:  fs.readFileSync('keys/server.key'),
-  cert: fs.readFileSync('keys/server.crt')
+  key:  fs.readFileSync('keys/key.pem'),
+  cert: fs.readFileSync('keys/cert.pem')
 };
 
 var app = express();
@@ -42,16 +44,18 @@ var app = express();
 /*
  * Management of sessions
  */
+app.use(cors());
 app.use(cookieParser());
 
-var sessionHandler = session({
-    secret : 'none',
-    rolling : true,
+var sessionParser = session({
+    secret : 'secret',
+    // rolling : true,
     resave : true,
+    noServer: true,
     saveUninitialized : true
 });
 
-app.use(sessionHandler);
+app.use(sessionParser);
 
 /*
  * Definition of global variables.
@@ -65,56 +69,106 @@ var kurentoClient = null;
  */
 var asUrl = url.parse(argv.as_uri);
 var port = asUrl.port;
-var server = https.createServer(options, app).listen(port, function() {
-    console.log('Kurento Tutorial started');
-    console.log('Open ' + url.format(asUrl) + ' with a WebRTC capable browser');
-});
+var server = https.createServer(options, app);
+
+
+function onSocketError(err) {
+    console.error(err);
+}
+
+
 
 var wss = new ws.Server({
     server : server,
-    path : '/rtprelay'
+    path : '/ws'
 });
+
+
+var ttt = 0;
+
+server.on('upgrade', function (request, socket, head) {
+    socket.on('error', onSocketError);
+
+    console.log('Parsing session from request...');
+
+    request['sessionID'] = 'randomsessionid'
+
+    // sessionParser(request, {}, () => {
+    //     if (!request.session.id) {
+    //         socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+    //         socket.destroy();
+    //         console.log( 'Socket destroied: session.id is undefined ' )
+    //         return;
+    //     }
+
+    //     console.log('Session is parsed!');
+
+    //     socket.removeListener('error', onSocketError);
+
+    //     console.log( '----------------------------', ++ttt)
+
+    //     wss.handleUpgrade(request, socket, head, function (ws) {
+    //         wss.emit('connection', ws, request);
+    //     });
+    // });
+
+
+});
+
+
+
+
+
 
 /*
  * Management of WebSocket messages
  */
-wss.on('connection', function(ws) {
-    var sessionId = null;
-    var request = ws.upgradeReq;
-    var response = {
-        writeHead : {}
-    };
 
-    sessionHandler(request, response, function(err) {
-        sessionId = request.session.id;
-        console.log('Connection received with sessionId ' + sessionId);
-    });
 
-    ws.on('error', function(error) {
+
+wss.on('connection', function(socket, request) {
+    var sessionId = request.sessionID || 'randomsessionid';
+    console.log( "SESSION ID:", sessionId)
+    // var response = {
+    //     writeHead : {}
+    // };
+
+    // console.log('sessionParser: ', socket.request, socket.upgradeReq);
+
+
+    // sessionParser(request, response, function(err) {
+
+
+    //     sessionId = request.session.id;
+    //     console.log('Connection received with sessionId ' + sessionId);
+    // });
+
+    socket.on('error', function(error) {
         console.log('Connection ' + sessionId + ' error');
         stop(sessionId);
     });
 
-    ws.on('close', function() {
+    socket.on('close', function() {
         console.log('Connection ' + sessionId + ' closed');
         stop(sessionId);
     });
 
-    ws.on('message', function(_message) {
+    socket.on('message', function(_message) {
         var message = JSON.parse(_message);
         console.log('Connection ' + sessionId + ' received message ', message);
 
         switch (message.id) {
         case 'start':
-            sessionId = request.session.id;
+console.log( 'start: ', sessionId);            
+            // sessionId = request.sessionID;
             start(sessionId, ws, message.sdpOffer, message.rtpSdp, function(error, sdpAnswer) {
                 if (error) {
-                    return ws.send(JSON.stringify({
+                    return socket.send(JSON.stringify({
                         id : 'error',
                         message : error
                     }));
                 }
-                ws.send(JSON.stringify({
+                socket.send(JSON.stringify({
                     id : 'startResponse',
                     sdpAnswer : sdpAnswer
                 }));
@@ -122,15 +176,17 @@ wss.on('connection', function(ws) {
             break;
 
         case 'stop':
+            console.log( 'stop');            
             stop(sessionId);
             break;
 
         case 'onIceCandidate':
+            console.log( 'onIceCandidate');            
             onIceCandidate(sessionId, message.candidate);
             break;
 
         default:
-            ws.send(JSON.stringify({
+            socket.send(JSON.stringify({
                 id : 'error',
                 message : 'Invalid message ' + message
             }));
@@ -196,13 +252,13 @@ function start(sessionId, ws, sdpOffer, rtpSdp, callback) {
                         return callback(error);
                     }
 
-                    webRtcEndpoint.on('OnIceCandidate', function(event) {
-                        var candidate = kurento.register.complexTypes.IceCandidate(event.candidate);
-                        ws.send(JSON.stringify({
-                            id : 'iceCandidate',
-                            candidate : candidate
-                        }));
-                    });
+                    // webRtcEndpoint.on('OnIceCandidate', function(event) {
+                    //     var candidate = kurento.register.complexTypes.IceCandidate(event.candidate);
+                    //     socket.send(JSON.stringify({
+                    //         id : 'iceCandidate',
+                    //         candidate : candidate
+                    //     }));
+                    // });
 
                     webRtcEndpoint.processOffer(sdpOffer, function(error, sdpAnswer) {
                         if (error) {
@@ -297,3 +353,8 @@ function onIceCandidate(sessionId, _candidate) {
 }
 
 app.use(express.static(path.join(__dirname, 'static')));
+
+server.listen(port, '0.0.0.0', function() {
+    console.log('Kurento Tutorial started');
+    console.log('Open ' + url.format(asUrl) + ' with a WebRTC capable browser');
+});
